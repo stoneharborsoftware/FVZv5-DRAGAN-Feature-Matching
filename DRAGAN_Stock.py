@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 import tensorflow as tf
 from tensorflow.keras.layers import Dense, Flatten, GRU, Conv1D, LeakyReLU, ReLU
 from tensorflow.keras import regularizers
-from tensorflow.keras.metrics import mean_squared_error, mean_absolute_error
+from tensorflow.keras.metrics import MSE as mean_squared_error, MAE as mean_absolute_error
 
 class Process_Data(object):
     def __init__(self, file_name, input_win, output_win):
@@ -17,7 +17,7 @@ class Process_Data(object):
         
     def load_data(self):
         # Load raw stock data from file_name.csv
-        self.raw_data = pd.read_csv(self.name, parse_dates=['Date'])
+        self.raw_data = pd.read_csv(self.name, parse_dates=['timestamp'])
         #print(self.raw_data.columns)
         
     def extract_features(self):
@@ -27,48 +27,48 @@ class Process_Data(object):
         df = ta.utils.dropna(self.raw_data)
        
         # Add upper band of bollinger band while filling nans values
-        df["BB_H_indicator"] = ta.volatility.bollinger_hband(df["Close"], window=20, window_dev=2, fillna=True)
+        df["BB_H_indicator"] = ta.volatility.bollinger_hband(df["close"], window=20, window_dev=2, fillna=True)
 
         # Add lower band of bollinger band
-        df["BB_l_indicator"] = ta.volatility.bollinger_lband(df["Close"], window=20, window_dev=2, fillna=True)
+        df["BB_l_indicator"] = ta.volatility.bollinger_lband(df["close"], window=20, window_dev=2, fillna=True)
 
         # Add middle of bollinger band 
-        df["BB_MA_indicator"] = ta.volatility.bollinger_mavg(df["Close"], window=20, fillna=True)
+        df["BB_MA_indicator"] = ta.volatility.bollinger_mavg(df["close"], window=20, fillna=True)
         
         # Add Relative Strength Index (RSI) 
-        df["RSI"] = ta.momentum.rsi(df["Close"], window=14, fillna=True)
+        df["RSI"] = ta.momentum.rsi(df["close"], window=14, fillna=True)
         
         # Add Stochastic RSI
-        df["Stoch"] = ta.momentum.stochrsi(df["Close"], window=14, smooth1=3, smooth2=3, fillna=True)
+        df["Stoch"] = ta.momentum.stochrsi(df["close"], window=14, smooth1=3, smooth2=3, fillna=True)
         
         # Add Moving Average Convergence Divergence (MACD)
-        df["MACD"] = ta.trend.macd(df["Close"], window_slow=26, window_fast=12, fillna=True)
+        df["MACD"] = ta.trend.macd(df["close"], window_slow=26, window_fast=12, fillna=True)
         
         # Add Exponential Moving Average (EMA) indicator
-        #df["EMA_ind"] = ta.trend.ema_indicator(df["Close"], window=12, fillna=True)
+        #df["EMA_ind"] = ta.trend.ema_indicator(df["close"], window=12, fillna=True)
         
         # Add Exponential Moving Average (EMA)
-        df["EMA"] = df["Close"].ewm(com=0.5).mean()
+        df["EMA"] = df["close"].ewm(com=0.5).mean()
         
         # Add Ichimoku
         #df["Ichi"] = ta.trend.ichimoku_base_line(df["High"], df["Low"], window1=9, window2=26, visual=False, fillna=True)        
         
         # Add Moving Average
-        # df['MA7'] = df["Close"].rolling(window=7).mean()
-        # df['MA21'] = df["Close"].rolling(window=21).mean()
+        # df['MA7'] = df["close"].rolling(window=7).mean()
+        # df['MA21'] = df["close"].rolling(window=21).mean()
         
         # Add log of momentum
-        df['log_momentum'] = np.log(df["Close"] - 1)
+        df['log_momentum'] = np.log(df["close"] - 1)
         
         df_new = df.iloc[20:,:].reset_index(drop=True)
         # print(df.columns)        
         print('\n Number of features : ',len(df.columns)-1)
         df_new.to_csv("feature_data.csv", index=False)
-        date_ = pd.to_datetime(df_new['Date'])
+        date_ = pd.to_datetime(df_new['timestamp'])
         index_ = pd.DatetimeIndex(date_.values)
         df_new = df_new.set_index(index_)
-        df_new = df_new.sort_values(by='Date')
-        df_new = df_new.drop(columns='Date')
+        df_new = df_new.sort_values(by='timestamp')
+        df_new = df_new.drop(columns='timestamp')
         
         # Transform features by scaling each feature to (-1,1) range
         df_new_y = pd.DataFrame(df_new.iloc[:, 3])
@@ -235,7 +235,7 @@ class DRAGAN(object):
         # index_e = []
         # for i in range(125, 221, 5):
         #     index_e.append(i)
-        #     self.gen.load_weights('DRAGAN_%d.h5' % i)
+        #     self.gen.load_weights('DRAGAN_%d.weights.h5' % i)
         #     y_p = self.gen(segment_test) 
         #     RMSE_scaled1, RMSE1, MAE1, R21 = compute_RMSE_MAE(y_test, y_p)     
         #     test_list.append(RMSE1)
@@ -249,7 +249,7 @@ class DRAGAN(object):
         # plt.ylabel('RMSE')
         # plt.show()
         # exit(0)
-        # self.gen.load_weights('DRAGAN_190.h5')  #uncomment this line when trained model is available
+        # self.gen.load_weights('DRAGAN_190.weights.h5')  #uncomment this line when trained model is available
         y_predict_ = self.gen(segment_test_t) 
         return y_predict_
    
@@ -326,10 +326,10 @@ def plot_result(y_true, y_pred, train = True):
 if __name__ == '__main__':
     iterations = 231
     input_win = 3
-    output_win = 1
+    output_win = 10
     
     # Preprocessing, extracting features and windowing on raw data  
-    stock_data = Process_Data('AAPL.csv', input_win, output_win)
+    stock_data = Process_Data('Data/CLK6.csv', input_win, output_win)
     stock_data.load_data()
     df_feature = stock_data.extract_features()
     stock_data.windowing()
@@ -369,11 +369,11 @@ if __name__ == '__main__':
         
         if (iteration % 5) == 0 and iteration> 120:
             print(iteration)
-            DRAGAN_model.gen.save_weights('DRAGAN_%d.h5' % iteration)
-            #tf.keras.models.save_model(DRAGAN_model.gen, 'DRAGAN_%d.h5' % iteration, save_format='tf')
+            DRAGAN_model.gen.save_weights('Model_trained/DRAGAN_%d.weights.h5' % iteration)
+            #tf.keras.models.save_model(DRAGAN_model.gen, 'DRAGAN_%d.weights.h5' % iteration, save_format='tf')
         
-    #DRAGAN_model.gen.load_weights('DRAGAN_20.h5')
-    DRAGAN_model.gen.save_weights('DRAGAN_last.h5')
+    #DRAGAN_model.gen.load_weights('DRAGAN_20.weights.h5')
+    DRAGAN_model.gen.save_weights('Model_trained/DRAGAN_last.weights.h5')
     print('\n=========================================================================')
     print('   RMSE_scaled', ' RMSE', '   MAE', '  R2-Score')
     

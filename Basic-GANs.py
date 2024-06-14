@@ -70,7 +70,9 @@ class Process_Data(object):
         df_new = df_new.set_index(index_)
         df_new = df_new.sort_values(by='timestamp')
         df_new = df_new.drop(columns='timestamp')
-        
+
+        print(df_new)
+
         # Transform features by scaling each feature to (-1,1) range
         df_new_y = pd.DataFrame(df_new.iloc[:, 3])
         self.scaler_y = sk.MinMaxScaler(feature_range=(-1, 1))
@@ -243,13 +245,16 @@ def multi_output(y_true, y_pred):
 
     pd_y_true = pd.DataFrame()
     for i in range(y1.shape[0]):
+        print("{} / {}".format(i, y1.shape[0]))
         train_i = pd.DataFrame(y1[i], columns=["y_true"], index = pd.Index(range(i,i+output_win,1)))
         pd_y_true = pd.concat([pd_y_true, train_i], axis=1, sort=False)
     pd_y_pred = pd.DataFrame()
+    print("Done1")
     for i in range(y2.shape[0]):
+        print("{} / {}".format(i, y1.shape[0]))
         predict_i = pd.DataFrame(y2[i], columns=["y_pred"], index = pd.Index(range(i,i+output_win,1)))
         pd_y_pred = pd.concat([pd_y_pred, predict_i], axis=1, sort=False)
-        
+    print("Done2")
     out1 = tf.reshape(pd_y_true.mean(axis=1)[0:y1.shape[0]], [y1.shape[0],1])
     out2 = tf.reshape(pd_y_pred.mean(axis=1)[0:y2.shape[0]], [y2.shape[0],1])
     return out1, out2
@@ -301,10 +306,10 @@ def plot_result(y_true, y_pred, train = True):
 if __name__ == '__main__':
     iterations = 221
     input_win = 3
-    output_win = 1
+    output_win = 3
     
     # Preprocessing, extracting features and windowing on raw data  
-    stock_data = Process_Data('Data/CLF6.csv', input_win, output_win)
+    stock_data = Process_Data('Data/AAL.csv', input_win, output_win)
     stock_data.load_data()
     df_feature = stock_data.extract_features()
     stock_data.windowing()
@@ -313,7 +318,9 @@ if __name__ == '__main__':
     segment_train, segment_test = split_train_test(stock_data.segments)
     y_train, y_test = split_train_test(stock_data.y)
     h_prices_train, h_prices_test = split_train_test(stock_data.h_prices)
-    
+
+    print(y_test)
+
     # Save the date column to calculate RMSE and plot    
     train_date = df_feature.iloc[0:segment_train.shape[0], :].index
     test_date = df_feature.iloc[segment_train.shape[0]:segment_train.shape[0]+ segment_test.shape[0] , :].index
@@ -347,8 +354,8 @@ if __name__ == '__main__':
             Basic_GAN_model.gen.save_weights('Model_trained/Basic_GAN_%d.weights.h5' % iteration)
             #tf.keras.models.save_model(Basic_GAN_model.gen, 'Basic_GAN_%d.h5' % iteration, save_format='tf')
     
-    #Basic_GAN_model.gen.load_weights('Basic_GAN_20.h5')
-    Basic_GAN_model.gen.save_weights('Basic_GAN_last.h5')
+    #Basic_GAN_model.gen.load_weights('Basic_GAN_last.weights.h5')
+    Basic_GAN_model.gen.save_weights('Basic_GAN_last.weights.h5')
     print('\n=========================================================================')
     print('   RMSE_scaled', ' RMSE', '   MAE', '  R2-Score')
     
@@ -369,13 +376,18 @@ if __name__ == '__main__':
 
     else:        
         y_predict_test = Basic_GAN_model.test(segment_test)
+        print("TEST1")
         y_test_, y_predict_test_ = multi_output(y_test, y_predict_test)
+        print("TEST2")
         RMSE_scaled, RMSE, MAE, R2 = compute_RMSE_MAE(y_test_, y_predict_test_)  
         print('_________________________________________________________________________')
         print('\nTest: ', '{:.2f}'.format(RMSE_scaled),'  ' , '{:.2f}'.format(RMSE),' ', '{:.2f}'.format(MAE),' ', '{:.2f}'.format(R2))
         
+        print('starting train1')
         y_predict_train = Basic_GAN_model.test(segment_train)
-        y_train_, y_predict_train_ = multi_output(y_train, y_predict_train)        
+        print('starting train2')
+        y_train_, y_predict_train_ = multi_output(y_train, y_predict_train)
+        print('starting train3') 
         RMSE_scaled, RMSE, MAE, R2 = compute_RMSE_MAE(y_train_, y_predict_train_)     
         print('_________________________________________________________________________')
         print('\nTrain:', '{:.2f}'.format(RMSE_scaled),'  ' , '{:.2f}'.format(RMSE),' ', '{:.2f}'.format(MAE),' ', '{:.2f}'.format(R2))
